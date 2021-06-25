@@ -18,7 +18,7 @@ class LoginViewController: UIViewController {
     
     private let imageView: UIImageView = {
         let imageView = UIImageView()
-        imageView.image = UIImage(named: "logo")
+        imageView.image = UIImage(named: "messenger")
         imageView.contentMode = .scaleAspectFit
         return imageView
     }()
@@ -75,7 +75,7 @@ class LoginViewController: UIViewController {
                                                             style: .done,
                                                             target: self,
                                                             action: #selector(didTapRegister))
-    
+        
         loginButton.addTarget(self, action: #selector(loginButtonTapped), for: .touchUpInside)
         // when the user hits return it can go between the fields itself the focus and once the user hits return on the password fields it automatically call this login function
         emailField.delegate = self
@@ -97,11 +97,11 @@ class LoginViewController: UIViewController {
         let size = scrollView.width/3
         // center our image view
         imageView.frame = CGRect(x: (scrollView.width-size)/2,
-                                 y: 20,
+                                 y: 30,
                                  width: size,
                                  height: size)
         emailField.frame = CGRect(x: 30,
-                                  y: imageView.bottom+10,
+                                  y: imageView.bottom+30,
                                   width: scrollView.width-60,
                                   height: 52)
         passwordField.frame = CGRect(x: 30,
@@ -128,7 +128,11 @@ class LoginViewController: UIViewController {
         // Firebase Log In
         FirebaseAuth.Auth.auth().signIn(withEmail: email,
                                         password: password,
-                                        completion: { authResult, error in
+                                        completion: { [weak self] authResult, error in
+                                            guard let strongSelf = self else {
+                                                return
+                                            }
+                                            
                                             guard let result = authResult, error == nil else {
                                                 print("Failed to log in user with email: \(email)")
                                                 return
@@ -136,6 +140,7 @@ class LoginViewController: UIViewController {
                                             
                                             let user = result.user
                                             print("Logded In User: \(user)")
+                                            strongSelf.navigationController?.dismiss(animated: true, completion: nil)
                                         })
         
     }
