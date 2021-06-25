@@ -7,6 +7,7 @@
 
 import UIKit
 import FirebaseAuth
+import FBSDKLoginKit
 
 class LoginViewController: UIViewController {
     
@@ -65,6 +66,13 @@ class LoginViewController: UIViewController {
         return button
     }()
     
+    private  let facebookLoginButton: FBLoginButton = {
+        let button = FBLoginButton()
+        button.permissions = ["email","public_profile"]
+        return button
+    }()
+    
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         // the LoginViewController we also gonna say title is login
@@ -81,12 +89,15 @@ class LoginViewController: UIViewController {
         emailField.delegate = self
         passwordField.delegate = self
         
+        facebookLoginButton.delegate = self
+        
         // Add subviews
         view.addSubview(scrollView)
         scrollView.addSubview(imageView)
         scrollView.addSubview(emailField)
         scrollView.addSubview(passwordField)
         scrollView.addSubview(loginButton)
+        scrollView.addSubview(facebookLoginButton)
         
     }
     
@@ -112,6 +123,11 @@ class LoginViewController: UIViewController {
                                    y: passwordField.bottom+20,
                                    width: scrollView.width-60,
                                    height: 52)
+        facebookLoginButton.frame = CGRect(x: 30,
+                                           y: loginButton.bottom+20,
+                                           width: scrollView.width-60,
+                                           height: 52)
+        facebookLoginButton.frame.origin.y = loginButton.bottom+20
     }
     
     @objc private func loginButtonTapped() {
@@ -179,4 +195,89 @@ extension LoginViewController: UITextFieldDelegate {
         
         return true
     }
+}
+
+extension LoginViewController: LoginButtonDelegate {
+    
+    func loginButtonDidLogOut(_ loginButton: FBLoginButton) {
+        // no operation
+    }
+    
+    // the whole function is the delegate function for when the facebook login button did completed
+    func loginButton(_ loginButton: FBLoginButton, didCompleteWith result: LoginManagerLoginResult?, error: Error?) {
+        // we're gonna unwrap the token from facebook
+        guard let token = result?.token?.tokenString else {
+            print("User failed to log in with Facebook")
+            return
+        }
+        
+        // then we're gonna make a request object to facebook to get the email and name gor the logged in user
+        let facebookRequest = FBSDKLoginKit.GraphRequest(graphPath: "me",
+                                                         parameters: ["fields": "email, name"],
+                                                         tokenString: token,
+                                                         version: nil,
+                                                         httpMethod: .get)
+        
+        // execute that request
+        facebookRequest.start(completionHandler: { _, result, error in
+            
+            // we're gonna get email and name from facebook back to the client app
+            guard let result = result as? [String: Any], error == nil else {
+                print("Failed to make facebook graph request")
+                return
+            }
+            // print("\(result)")
+            // unwrap that data
+            guard let userName = result["name"] as? String,
+                  let email = result["email"] as? String else {
+                print("Failed to get email  and name from FB result")
+                return
+            }
+            
+            // we're gonna split the name to get the first name and last name out
+            let nameCompoenets = userName.components(separatedBy: " ")
+            guard nameCompoenets.count == 2 else {
+                return
+            }
+            
+            let firstName = nameCompoenets[0]
+            let lastName = nameCompoenets[1]
+            
+            // we're wanna check email exists
+            // we're gonna use our database manager object to check if the email exists in the database that we got from facebook, if it doesn't exist we're gonna insert into the database
+            // and this will continue to happen even if the user doesn't exist it'll dispatched
+            DatabaseManager.shared.userExists(with: email, completion: { exists in
+                if !exists {
+                    DatabaseManager.shared.insertUser(with: ChatAppUser(firstName: firstName,
+                                                                        lastName: lastName,
+                                                                        emailAddress: email))
+                }
+            })
+            
+            // we're gonna trade the access oken from facebook
+            // here to get a firebase credential and that we're gonna use that credential on a firebase
+            let credential = FacebookAuthProvider.credential(withAccessToken: token)
+            FirebaseAuth.Auth.auth().signIn(with: credential, completion: { [weak self ] authResult, error in
+                guard let strongSelf = self else {
+                    return
+                }
+                
+                guard authResult != nil, error == nil else {
+                    if let error = error {
+                        print("Fcaebook credential login failed, MFA may be needed - \(error)")
+                    }
+                    return
+                }
+                
+                print("Successfully logged user in")
+                // strongSelf as to not cause a memory leak, use weak self
+                strongSelf.navigationController?.dismiss(animated: true, completion: nil)
+            })
+            
+        })
+        
+        
+    }
+    
+    
 }
