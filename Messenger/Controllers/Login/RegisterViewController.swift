@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import FirebaseAuth
 
 class RegisterViewController: UIViewController {
     
@@ -20,6 +21,9 @@ class RegisterViewController: UIViewController {
         imageView.image = UIImage(systemName: "person")
         imageView.tintColor = .gray
         imageView.contentMode = .scaleAspectFit
+        imageView.layer.masksToBounds = true
+        imageView.layer.borderWidth = 2
+        imageView.layer.borderColor = UIColor.lightGray.cgColor
         return imageView
     }()
     
@@ -133,7 +137,7 @@ class RegisterViewController: UIViewController {
     }
     
     @objc private func didTapChangeProfilePic() {
-        print("Change pic called")
+        presentPhotoActionSheet()
     }
     
     override func viewDidLayoutSubviews() {
@@ -146,6 +150,9 @@ class RegisterViewController: UIViewController {
                                  y: 20,
                                  width: size,
                                  height: size)
+        
+        imageView.layer.cornerRadius = imageView.width/2.0
+        
         firstNameField.frame = CGRect(x: 30,
                                   y: imageView.bottom+10,
                                   width: scrollView.width-60,
@@ -188,7 +195,20 @@ class RegisterViewController: UIViewController {
             return
         }
         
-        // Firebase Log In
+        // Firebase Register
+        // we wanna do create account with an email and password
+        FirebaseAuth.Auth.auth().createUser(withEmail: email,
+                                            password: password,
+                                            completion: { authResult, error in
+                                                guard let result = authResult, error == nil else {
+                                                    print("Error creating user")
+                                                    return
+                                                }
+                                                
+                                                let user = result.user
+                                                print("Created User: \(user)")
+                                                
+                                            })  // completion return two things -> auth result and an error
         
     }
     
@@ -226,4 +246,71 @@ extension RegisterViewController: UITextFieldDelegate {
         
         return true
     }
+}
+
+// this delegate essentially allows us to get the results of an user taking a picture or selecting a photo from the camera roll
+extension RegisterViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+    
+    // present action sheet
+    // the action sheet is gonna have two options
+    // for the user to pick from first one is gonna be take a photo
+    // and second one will be choose photo
+    func presentPhotoActionSheet() {
+        let actionSheet = UIAlertController(title: "Profile Picture",
+                                            message: "How would you like to select a picture?",
+                                            preferredStyle: .actionSheet)
+        
+        actionSheet.addAction(UIAlertAction(title: "Cancel",
+                                            style: .cancel,
+                                            handler: nil))
+        actionSheet.addAction(UIAlertAction(title: "Take a photo",
+                                            style: .default,
+                                            handler: { [weak self] _ in
+                                                // need this so a memory retention
+                                                // self becomes optional because it's weak so we can call the camera fuction
+                                                self?.presentCamera()
+                                            }))
+        actionSheet.addAction(UIAlertAction(title: "Select photo",
+                                            style: .default,
+                                            handler: { [weak self] _ in
+                                                self?.presentPhotoPicker()
+                                            }))
+        
+        present(actionSheet, animated: true)
+        
+    }
+    
+    func presentCamera() {
+        let vc = UIImagePickerController()
+        vc.sourceType = .camera
+        vc.delegate = self      // the result is captured in here
+        vc.allowsEditing = true // this will the user to select a cropped out square of the picture
+        present(vc, animated: true)
+    }
+    
+    func presentPhotoPicker() {
+        let vc = UIImagePickerController()
+        vc.sourceType = .photoLibrary
+        vc.delegate = self
+        vc.allowsEditing = true
+        present(vc, animated: true)
+    }
+    
+    // this is actually the only other one that is available to us
+    // and this one gets called when the user takes a photo or they select the photo
+    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+        
+        picker.dismiss(animated: true, completion: nil)
+        
+        guard let selectedImage = info[UIImagePickerController.InfoKey.editedImage] as? UIImage else {
+            return
+        }
+        self.imageView.image = selectedImage
+    }
+    
+    // this one gets called when the user cancels the taking of the picture or photo selection
+    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+        picker.dismiss(animated: true, completion: nil)
+    }
+    
 }

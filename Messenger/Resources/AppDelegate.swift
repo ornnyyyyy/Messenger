@@ -6,14 +6,15 @@
 //
 
 import UIKit
+import Firebase
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
-
-
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
+        // if you try to this configure function and run your app without bringing in that Google services file your app will cash 
+        FirebaseApp.configure()
         return true
     }
 
